@@ -4,85 +4,86 @@
 package main
 
 import (
-	"bufio"
+	"errors"
+	"fmt"
 	"io"
+	"net/textproto"
+	"strings"
 )
 
 func rewriteMessage(w io.Writer, r io.Reader) error {
-	lr := newLineReader(r)
+	mr := newMessageReader(r)
+
+	// Read the top-level header (consisting of multiple header fields).
+	header := make(map[string][]string)
 	for {
-		folded, _, err := lr.readFolded()
+		folded, unfolded, err := mr.readFoldedLine()
+		if err == io.EOF {
+			return errors.New("missing body")
+		} else if err != nil {
+			return err
+		}
+
+		// A blank line indicates the end of the header.
+		if unfolded == "" {
+			if len(folded) != 1 {
+				return errors.New("blank line is folded") // should never happen
+			}
+			if _, err := io.WriteString(w, folded[0]); err != nil {
+				return err
+			}
+			break
+		}
+
+		key, val, err := parseHeaderField(unfolded)
+		if err != nil {
+			return fmt.Errorf("malformed header field %q: %v", unfolded, err)
+		}
+		header[key] = append(header[key], val)
+
+		for _, ln := range folded {
+			if _, err := io.WriteString(w, ln); err != nil {
+				return err
+			}
+		}
+	}
+
+	// TODO: Use the Content-Type header to parse the body.
+
+	// Read the top-level body.
+	for {
+		ln, err := mr.readLine()
 		if err == io.EOF {
 			break
 		} else if err != nil {
 			return err
 		}
-		for _, ln := range folded {
-			if _, err := w.Write(ln); err != nil {
-				return err
-			}
+		if _, err := io.WriteString(w, ln); err != nil {
+			return err
 		}
 	}
+
 	return nil
 }
 
-type lineReader struct {
-	r *bufio.Reader
-}
+// parseHeaderField splits ln, e.g. "from: \"Bob\" <user@example.org>", into
+// a canonicalized key and value, e.g. "From" and "\"Bob\" <user@example.org>".
+func parseHeaderField(ln string) (key, val string, err error) {
+	// TODO: Check that the line doesn't start with whitespace?
+	// https://cs.opensource.google/go/go/+/refs/tags/go1.18:src/net/textproto/reader.go;l=497
+	// checks this for the first line.
 
-func newLineReader(r io.Reader) *lineReader {
-	return &lineReader{r: bufio.NewReader(r)}
-}
-
-// readFolded reads and returns a possibly-folded line.
-//
-// See https://www.rfc-editor.org/rfc/rfc5322.html#section-2.2.3 for more
-// details about folding.
-//
-// The folded return value contains all of the original lines, including
-// terminating "\r\n" or "\n" suffixes if present.
-//
-// The unfolded return value contains the unfolded line, i.e. with all
-// terminating suffixes removed.
-func (lr *lineReader) readFolded() (folded [][]byte, unfolded []byte, err error) {
-	first, err := lr.r.ReadBytes('\n')
-	if err != nil && (err != io.EOF || len(first) == 0) {
-		return nil, nil, err
-	}
-	folded = append(folded, first)
-	unfolded = trimCRLF(first)
-	if len(unfolded) == 0 {
-		return folded, unfolded, nil
+	// This is basically strings.Cut, but that wasn't introduced until Go 1.18.
+	idx := strings.IndexByte(ln, ':')
+	if idx < 0 {
+		return "", "", errors.New("missing colon")
 	}
 
-	for {
-		next, err := lr.r.Peek(1)
-		if err == io.EOF {
-			return folded, unfolded, nil
-		} else if err != nil {
-			return nil, nil, err
-		}
-		if next[0] == ' ' || next[0] == '\t' {
-			ln, err := lr.r.ReadBytes('\n')
-			if err != nil && (err != io.EOF || len(ln) == 0) {
-				return nil, nil, err
-			}
-			folded = append(folded, ln)
-			unfolded = append(unfolded, trimCRLF(ln)...)
-		} else {
-			return folded, unfolded, nil
-		}
-	}
-	return folded, unfolded, nil
-}
+	key = textproto.CanonicalMIMEHeaderKey(ln[:idx])
 
-// trimCRLF trims a trailing "\r\n" (or just "\n") from ln.
-func trimCRLF(ln []byte) []byte {
-	if len(ln) > 0 && ln[len(ln)-1] == '\n' {
-		ln = ln[:len(ln)-1]
-		if len(ln) > 0 && ln[len(ln)-1] == '\r' {
-			ln = ln[:len(ln)-1]
-		}
-	}
-	return ln
+	// TODO: Is this right?
+	// https://cs.opensource.google/go/go/+/refs/tags/go1.18:src/net/textproto/reader.go;l=526
+	val = strings.TrimLeft(ln[idx+1:], " \t")
+
+	return key, val, nil
 }
