@@ -29,6 +29,13 @@ func newMessageReader(r io.Reader) *messageReader {
 // a newline, then the data and nil are returned. If EOF is
 // encountered before reading any bytes, than io.EOF is returned.
 func (mr *messageReader) readLine() (string, error) {
+	// RFC 5322 2.1.1 "Line Length Limits":
+	//  There are two limits that this specification places on the number of
+	//  characters in a line.  Each line of characters MUST be no more than
+	//  998 characters, and SHOULD be no more than 78 characters, excluding
+	//  the CRLF.
+
+	// TODO: Add an upper bound on how long the line can be?
 	ln, err := mr.r.ReadString('\n')
 	if err == io.EOF && ln != "" {
 		err = nil
@@ -38,7 +45,7 @@ func (mr *messageReader) readLine() (string, error) {
 
 // readFoldedLine reads and returns a possibly-folded line.
 //
-// See RFC 2.2.3, "Long Header Fields", for more details about folding.
+// See RFC 5322 2.2.3, "Long Header Fields", for more details about folding.
 // This function is similar to ReadContinuedLine from Reader in net/textproto.
 //
 // The folded return value contains all of the original lines, including
@@ -57,6 +64,8 @@ func (mr *messageReader) readFoldedLine() (folded []string, unfolded string, err
 		return folded, unfolded, nil
 	}
 
+	// TODO: Limit how long the unfolded line can be? I don't see any hard
+	// limits in the RFC, though.
 	for {
 		if next, err := mr.r.Peek(1); err == io.EOF {
 			return folded, unfolded, nil // input ends after newline

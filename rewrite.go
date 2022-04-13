@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-// rewriteMessage reads an RFC 5233 (or RFC 2822, or RFC 822, sigh) message from
+// rewriteMessage reads an RFC 5322 (or RFC 2822, or RFC 822, sigh) message from
 // r and writes it to w.
 func rewriteMessage(r io.Reader, w io.Writer) error {
 	_, err := copyMessagePart(newMessageReader(r), w, "")
@@ -20,7 +20,7 @@ func rewriteMessage(r io.Reader, w io.Writer) error {
 }
 
 // copyMessagePart reads a message part consisting of a header, a blank line,
-// and a body from mr and writes it to w. The part can either be a full RFC 5233/2822/822
+// and a body from mr and writes it to w. The part can either be a full RFC 5322/2822/822
 // message or an RFC 2045/2046 message body part terminated by delim.
 func copyMessagePart(mr *messageReader, w io.Writer, delim string) (end bool, err error) {
 	header, err := copyHeader(mr, w)
