@@ -10,7 +10,7 @@ import (
 
 func main() {
 	os.Exit(func() int {
-		if err := rewriteMessage(os.Stdout, os.Stdin); err != nil {
+		if err := rewriteMessage(os.Stdin, os.Stdout); err != nil {
 			fmt.Fprintln(os.Stderr, "Failed rewriting message:", err)
 			return 1
 		}

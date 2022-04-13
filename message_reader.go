@@ -38,9 +38,8 @@ func (mr *messageReader) readLine() (string, error) {
 
 // readFoldedLine reads and returns a possibly-folded line.
 //
-// See https://www.rfc-editor.org/rfc/rfc5322.html#section-2.2.3 for more
-// details about folding. This function is similar to ReadContinuedLine
-// from Reader in net/textproto.
+// See RFC 2.2.3, "Long Header Fields", for more details about folding.
+// This function is similar to ReadContinuedLine from Reader in net/textproto.
 //
 // The folded return value contains all of the original lines, including
 // terminating "\r\n" or "\n" suffixes if present.
@@ -77,6 +76,11 @@ func (mr *messageReader) readFoldedLine() (folded []string, unfolded string, err
 }
 
 // trimCRLF trims a trailing "\r\n" (or just "\n") from ln.
+//
+// RFC 5322 2.3 says "CR and LF MUST only occur together as CRLF; they MUST NOT appear
+// independently in the body.", but I think that all bets are off by the time that we're
+// looking at e.g. a Maildir message file. On a Linux system, I always see only "\n"
+// without a preceding "\r".
 func trimCRLF(ln string) string {
 	if len(ln) > 0 && ln[len(ln)-1] == '\n' {
 		ln = ln[:len(ln)-1]
