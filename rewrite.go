@@ -21,47 +21,16 @@ func rewriteMessage(r io.Reader, w io.Writer) error {
 
 // copyMessagePart reads a message part consisting of a header, a blank line,
 // and a body from mr and writes it to w. The part can either be a full RFC 5233/2822/822
-// message or a part of an RFC 2045/2046 message body delimited by delim.
+// message or an RFC 2045/2046 message body part terminated by delim.
 func copyMessagePart(mr *messageReader, w io.Writer, delim string) (end bool, err error) {
-	// Read the header (consisting of multiple header fields).
-	// TODO: Move this into a copyHeader function.
-	header := make(map[string][]string)
-	for {
-		folded, unfolded, err := mr.readFoldedLine()
-		if err == io.EOF {
-			return false, errors.New("missing body")
-		} else if err != nil {
-			return false, err
-		}
-
-		// A blank line indicates the end of the header.
-		if unfolded == "" {
-			if len(folded) != 1 {
-				return false, errors.New("blank line is folded") // should never happen
-			}
-			if _, err := io.WriteString(w, folded[0]); err != nil {
-				return false, err
-			}
-			break
-		}
-
-		key, val, err := parseHeaderField(unfolded)
-		if err != nil {
-			return false, fmt.Errorf("malformed header field %q: %v", unfolded, err)
-		}
-		header[key] = append(header[key], val)
-
-		for _, ln := range folded {
-			if _, err := io.WriteString(w, ln); err != nil {
-				return false, err
-			}
-		}
+	header, err := copyHeader(mr, w)
+	if err != nil {
+		return false, err
 	}
 
-	// TODO: We may need to check this in the header-reading loop, since we need to
-	// rewrite headers if we're deleting the body. Alternately, we could buffer the
-	// header lines in-memory (they seem unlikely to be large) and then write them
-	// all at once.
+	// TODO: We may need to check this copyHeader, since we need to rewrite headers
+	// if we're deleting the body. Alternately, we could buffer the header lines
+	// in-memory (they seem unlikely to be large) and then write them all at once.
 	ctype := header["Content-Type"]
 	if len(ctype) == 0 {
 		// Use the default from RFC 2045 5.2, "Content-Type defaults".
@@ -123,6 +92,44 @@ func copyMessagePart(mr *messageReader, w io.Writer, delim string) (end bool, er
 	return copyBody(mr, w, delim)
 }
 
+// copyHeader reads the header portion of a message part from mr and writes it to w.
+// The trailing blank line at the end of the header is written before returning.
+func copyHeader(mr *messageReader, w io.Writer) (map[string][]string, error) {
+	// The header consists of multiple (possibly repeated) header fields.
+	header := make(map[string][]string)
+	for {
+		folded, unfolded, err := mr.readFoldedLine()
+		if err == io.EOF {
+			return nil, errors.New("missing body")
+		} else if err != nil {
+			return nil, err
+		}
+
+		// A blank line indicates the end of the header.
+		if unfolded == "" {
+			if len(folded) != 1 {
+				return nil, errors.New("blank line is folded") // should never happen
+			}
+			if _, err := io.WriteString(w, folded[0]); err != nil {
+				return nil, err
+			}
+			return header, nil // done
+		}
+
+		key, val, err := parseHeaderField(unfolded)
+		if err != nil {
+			return nil, fmt.Errorf("malformed header field %q: %v", unfolded, err)
+		}
+		header[key] = append(header[key], val)
+
+		for _, ln := range folded {
+			if _, err := io.WriteString(w, ln); err != nil {
+				return nil, err
+			}
+		}
+	}
+}
+
 // copyBody reads lines from mr and writes them to w until it finds delim
 // at the beginning of a line. The delimiter line is written before returning.
 //
@@ -133,7 +140,7 @@ func copyBody(mr *messageReader, w io.Writer, delim string) (end bool, err error
 		ln, err := mr.readLine()
 		if err == io.EOF {
 			if delim == "" {
-				return true, nil
+				return true, nil // done
 			} else {
 				// TODO: Should we be lenient in some cases, e.g. the outermost parts?
 				// For example, hard_ham/0142.0220f772ab37ba8d5899fc62f6878edf from the
