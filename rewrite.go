@@ -28,7 +28,7 @@ func copyMessagePart(mr *messageReader, w io.Writer, delim string) (end bool, er
 		return false, err
 	}
 
-	// TODO: We may need to check this copyHeader, since we need to rewrite headers
+	// TODO: We should parse this in copyHeader, since we need to rewrite headers
 	// if we're deleting the body. Alternately, we could buffer the header lines
 	// in-memory (they seem unlikely to be large) and then write them all at once.
 	ctype := header["Content-Type"]
@@ -55,8 +55,12 @@ func copyMessagePart(mr *messageReader, w io.Writer, delim string) (end bool, er
 		//  NOT ending with white space. (If a boundary delimiter line appears to
 		//  end with white space, the white space must be presumed to have been
 		//  added by a gateway, and must be deleted.)
+		//
+		// I've seen invalid 71-character boundaries being used in the wild, e.g.
+		// "--=_NextPart_5213_0a55_d6217661_9281_11d9_a2b8_0040529d55d7_alternative",
+		// so I'm choosing to not check the length here.
 		bnd := params["boundary"]
-		if len(bnd) < 1 || len(bnd) > 70 {
+		if bnd == "" {
 			return false, fmt.Errorf("invalid boundary %q", bnd)
 		}
 		subDelim := "--" + bnd
