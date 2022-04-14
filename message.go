@@ -12,6 +12,9 @@ import (
 	"strings"
 )
 
+// Defaults from RFC 2045 5.2, "Content-Type defaults".
+var defaultMediaType, defaultContentParams, _ = mime.ParseMediaType("text/plain; charset=us-ascii")
+
 // rewriteMessage reads an RFC 5322 (or RFC 2822, or RFC 822, sigh) message from
 // r and writes it to w.
 func rewriteMessage(r io.Reader, w io.Writer) error {
@@ -23,31 +26,12 @@ func rewriteMessage(r io.Reader, w io.Writer) error {
 // and a body from lr and writes it to w. The part can either be a full RFC 5322/2822/822
 // message or an RFC 2045/2046 message body part terminated by delim.
 func copyMessagePart(lr *lineReader, w io.Writer, delim string) (end bool, err error) {
-	header, err := copyHeader(lr, w)
+	hdata, err := copyHeader(lr, w)
 	if err != nil {
 		return false, err
 	}
 
-	// TODO: We should parse this in copyHeader, since we need to rewrite headers
-	// if we're deleting the body. Alternately, we could buffer the header lines
-	// in-memory (they seem unlikely to be large) and then write them all at once.
-	ctype := header["Content-Type"]
-	if len(ctype) == 0 {
-		// Use the default from RFC 2045 5.2, "Content-Type defaults".
-		ctype = []string{"text/plain; charset=us-ascii"}
-	}
-
-	mtype, params, err := mime.ParseMediaType(ctype[0])
-	if err != nil {
-		// TODO: Decide how bad Content-Type headers should be handled.
-		// For example, hard_ham/0188.7fc83c7dcf3fa40cb98e61a8e8661a03 in the
-		// SpamAssassin corpus contains "text/plain; Windows-1252", and
-		// spam_2/01359.deafa1d42658c6624c6809a446b7f369 has a "file"
-		// parameter that includes an unquoted space.
-		return false, fmt.Errorf("unparseable Content-Type %q: %v", ctype[0], err)
-	}
-
-	if strings.HasPrefix(mtype, "multipart/") {
+	if strings.HasPrefix(hdata.mediaType, "multipart/") {
 		// RFC 2046 5.1.1:
 		//  The only mandatory global parameter for the "multipart" media type is
 		//  the boundary parameter, which consists of 1 to 70 characters from a
@@ -59,7 +43,7 @@ func copyMessagePart(lr *lineReader, w io.Writer, delim string) (end bool, err e
 		// I've seen invalid 71-character boundaries being used in the wild, e.g.
 		// "--=_NextPart_5213_0a55_d6217661_9281_11d9_a2b8_0040529d55d7_alternative",
 		// so I'm choosing to not check the length here.
-		bnd := params["boundary"]
+		bnd := hdata.contentParams["boundary"]
 		if bnd == "" {
 			return false, fmt.Errorf("invalid boundary %q", bnd)
 		}
@@ -96,39 +80,73 @@ func copyMessagePart(lr *lineReader, w io.Writer, delim string) (end bool, err e
 	return copyBody(lr, w, delim)
 }
 
+// headerData contains information parsed by copyHeader from a message part.
+type headerData struct {
+	mediaType     string            // media type from Content-Type , e.g. "text-plain" or "multipart/mixed"
+	contentParams map[string]string // additional parameters from Content-Type
+}
+
 // copyHeader reads the header portion of a message part from lr and writes it to w.
 // The trailing blank line at the end of the header is written before returning.
-func copyHeader(lr *lineReader, w io.Writer) (map[string][]string, error) {
-	// The header consists of multiple (possibly repeated) header fields.
-	header := make(map[string][]string)
+func copyHeader(lr *lineReader, w io.Writer) (data headerData, err error) {
+	data.mediaType = defaultMediaType
+	data.contentParams = defaultContentParams
+	gotContentType := false
+
 	for {
 		folded, unfolded, err := lr.readFoldedLine()
 		if err == io.EOF {
-			return nil, errors.New("missing body")
+			return data, errors.New("missing body")
 		} else if err != nil {
-			return nil, err
+			return data, err
 		}
 
 		// A blank line indicates the end of the header.
 		if unfolded == "" {
 			if len(folded) != 1 {
-				return nil, errors.New("blank line is folded") // should never happen
+				return data, errors.New("blank line is folded") // should never happen
 			}
 			if _, err := io.WriteString(w, folded[0]); err != nil {
-				return nil, err
+				return data, err
 			}
-			return header, nil // done
+			return data, nil // done
 		}
 
-		key, val, err := parseHeaderField(unfolded)
-		if err != nil {
-			return nil, fmt.Errorf("malformed header field %q: %v", unfolded, err)
+		if key, val, err := parseHeaderField(unfolded); err != nil {
+			return data, fmt.Errorf("malformed header field %q: %v", unfolded, err)
+		} else if key == "Content-Type" && !gotContentType {
+			mtype, params, err := mime.ParseMediaType(val)
+			if err != nil {
+				// RFC 2045 5.2:
+				//  It is also recommend that this default be assumed when a
+				//  syntactically invalid Content-Type header field is encountered.
+				mtype = defaultMediaType
+				params = defaultContentParams
+
+				// TODO: Maybe still return an error for multipart?
+				//return data, fmt.Errorf("unparseable Content-Type %q: %v", val, err)
+			}
+
+			data.mediaType = mtype
+			data.contentParams = params
+			gotContentType = true
+
+			// TODO: If we see a media type indicating that the part should be dropped,
+			// replace it with something like this (copying what mutt does when deleting
+			// an attachment):
+			//
+			//  Content-Type: message/external-body; access-type=x-mutt-deleted;
+			//          expiration="Mon, 6 Jan 2020 16:51:39 -0400"; length=340416
+			//
+			// Then add a blank line and write the rest of the headers as the part's body,
+			// skip the original body, but still write the terminating delimiter.
+			//
+			// message/external-body is described in RFC 1341 7.3.3.
 		}
-		header[key] = append(header[key], val)
 
 		for _, ln := range folded {
 			if _, err := io.WriteString(w, ln); err != nil {
-				return nil, err
+				return data, err
 			}
 		}
 	}
