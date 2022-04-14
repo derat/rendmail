@@ -15,15 +15,15 @@ import (
 // rewriteMessage reads an RFC 5322 (or RFC 2822, or RFC 822, sigh) message from
 // r and writes it to w.
 func rewriteMessage(r io.Reader, w io.Writer) error {
-	_, err := copyMessagePart(newMessageReader(r), w, "")
+	_, err := copyMessagePart(newLineReader(r), w, "")
 	return err
 }
 
 // copyMessagePart reads a message part consisting of a header, a blank line,
-// and a body from mr and writes it to w. The part can either be a full RFC 5322/2822/822
+// and a body from lr and writes it to w. The part can either be a full RFC 5322/2822/822
 // message or an RFC 2045/2046 message body part terminated by delim.
-func copyMessagePart(mr *messageReader, w io.Writer, delim string) (end bool, err error) {
-	header, err := copyHeader(mr, w)
+func copyMessagePart(lr *lineReader, w io.Writer, delim string) (end bool, err error) {
+	header, err := copyHeader(lr, w)
 	if err != nil {
 		return false, err
 	}
@@ -76,14 +76,14 @@ func copyMessagePart(mr *messageReader, w io.Writer, delim string) (end bool, er
 		//  similar to an RFC 822 message in syntax, but different in meaning.
 
 		// First, read the preamble (e.g. "This is a multi-part message in MIME format.").
-		if end, err := copyBody(mr, w, subDelim); err != nil {
+		if end, err := copyBody(lr, w, subDelim); err != nil {
 			return false, err
 		} else if !end {
 			// Next, copy the enclosed parts until we see the closing outer delimiter.
 			// TODO: Is it valid for the preamble to be immediately followed by a
 			// closing boundary delimiter?
 			for {
-				if end, err := copyMessagePart(mr, w, subDelim); err != nil {
+				if end, err := copyMessagePart(lr, w, subDelim); err != nil {
 					return false, err
 				} else if end {
 					break
@@ -93,16 +93,16 @@ func copyMessagePart(mr *messageReader, w io.Writer, delim string) (end bool, er
 	}
 
 	// Read the top-level body until we see the outer boundary.
-	return copyBody(mr, w, delim)
+	return copyBody(lr, w, delim)
 }
 
-// copyHeader reads the header portion of a message part from mr and writes it to w.
+// copyHeader reads the header portion of a message part from lr and writes it to w.
 // The trailing blank line at the end of the header is written before returning.
-func copyHeader(mr *messageReader, w io.Writer) (map[string][]string, error) {
+func copyHeader(lr *lineReader, w io.Writer) (map[string][]string, error) {
 	// The header consists of multiple (possibly repeated) header fields.
 	header := make(map[string][]string)
 	for {
-		folded, unfolded, err := mr.readFoldedLine()
+		folded, unfolded, err := lr.readFoldedLine()
 		if err == io.EOF {
 			return nil, errors.New("missing body")
 		} else if err != nil {
@@ -134,14 +134,14 @@ func copyHeader(mr *messageReader, w io.Writer) (map[string][]string, error) {
 	}
 }
 
-// copyBody reads lines from mr and writes them to w until it finds delim
+// copyBody reads lines from lr and writes them to w until it finds delim
 // at the beginning of a line. The delimiter line is written before returning.
 //
 // The returned end value is true if the delimiter was suffixed by "--" or if delim is empty and
 // EOF was encountered. If delim is non-empty and EOF is encountered, an error is returned.
-func copyBody(mr *messageReader, w io.Writer, delim string) (end bool, err error) {
+func copyBody(lr *lineReader, w io.Writer, delim string) (end bool, err error) {
 	for {
-		ln, err := mr.readLine()
+		ln, err := lr.readLine()
 		if err == io.EOF {
 			if delim == "" {
 				return true, nil // done

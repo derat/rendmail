@@ -8,17 +8,17 @@ import (
 	"io"
 )
 
-// messageReader reads an email message line-by-line.
+// lineReader reads an email message line-by-line.
 //
 // Its functionality is similar to the ReadLine and ReadContinuedLine
 // functions from Reader in the net/textproto, except it additionally returns
 // the original data to callers.
-type messageReader struct {
+type lineReader struct {
 	r *bufio.Reader
 }
 
-func newMessageReader(r io.Reader) *messageReader {
-	return &messageReader{r: bufio.NewReader(r)}
+func newLineReader(r io.Reader) *lineReader {
+	return &lineReader{r: bufio.NewReader(r)}
 }
 
 // readLine reads and returns a single newline-terminated line.
@@ -28,7 +28,7 @@ func newMessageReader(r io.Reader) *messageReader {
 // If one or more bytes are read but EOF is encountered before
 // a newline, then the data and nil are returned. If EOF is
 // encountered before reading any bytes, than io.EOF is returned.
-func (mr *messageReader) readLine() (string, error) {
+func (lr *lineReader) readLine() (string, error) {
 	// RFC 5322 2.1.1 "Line Length Limits":
 	//  There are two limits that this specification places on the number of
 	//  characters in a line.  Each line of characters MUST be no more than
@@ -36,7 +36,7 @@ func (mr *messageReader) readLine() (string, error) {
 	//  the CRLF.
 
 	// TODO: Add an upper bound on how long the line can be?
-	ln, err := mr.r.ReadString('\n')
+	ln, err := lr.r.ReadString('\n')
 	if err == io.EOF && ln != "" {
 		err = nil
 	}
@@ -53,8 +53,8 @@ func (mr *messageReader) readLine() (string, error) {
 //
 // The unfolded return value contains the unfolded line, i.e. with all
 // terminating suffixes removed.
-func (mr *messageReader) readFoldedLine() (folded []string, unfolded string, err error) {
-	first, err := mr.readLine()
+func (lr *lineReader) readFoldedLine() (folded []string, unfolded string, err error) {
+	first, err := lr.readLine()
 	if err != nil {
 		return nil, "", err
 	}
@@ -67,7 +67,7 @@ func (mr *messageReader) readFoldedLine() (folded []string, unfolded string, err
 	// TODO: Limit how long the unfolded line can be? I don't see any hard
 	// limits in the RFC, though.
 	for {
-		if next, err := mr.r.Peek(1); err == io.EOF {
+		if next, err := lr.r.Peek(1); err == io.EOF {
 			return folded, unfolded, nil // input ends after newline
 		} else if err != nil {
 			return nil, "", err
@@ -75,7 +75,7 @@ func (mr *messageReader) readFoldedLine() (folded []string, unfolded string, err
 			return folded, unfolded, nil // next line isn't a continuation
 		}
 
-		ln, err := mr.readLine()
+		ln, err := lr.readLine()
 		if err != nil {
 			return nil, "", err
 		}
