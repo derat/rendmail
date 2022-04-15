@@ -1,0 +1,31 @@
+MIME-Version: 1.0
+Date: Fri, 15 Apr 2022 11:11:14 -0400
+Message-ID: <xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx@mail.gmail.com>
+Subject: Example message with small audio file
+From: Redacted <user@example.org>
+To: Redacted <user@example.org>
+Content-Type: multipart/mixed; boundary="0000000000006e354605dcb2d28c"
+
+--0000000000006e354605dcb2d28c
+Content-Type: multipart/alternative; boundary="0000000000006e354405dcb2d28a"
+
+--0000000000006e354405dcb2d28a
+Content-Type: text/plain; charset="UTF-8"
+
+
+
+--0000000000006e354405dcb2d28a
+Content-Type: text/html; charset="UTF-8"
+
+<div dir="ltr"><br></div>
+
+--0000000000006e354405dcb2d28a--
+--0000000000006e354605dcb2d28c
+Content-Type: audio/wav; name="wav.wav"
+Content-Disposition: attachment; filename="wav.wav"
+Content-Transfer-Encoding: base64
+X-Attachment-Id: f_l20ki2c10
+Content-ID: <f_l20ki2c10>
+
+UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=
+--0000000000006e354605dcb2d28c--

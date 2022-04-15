@@ -9,29 +9,36 @@ import (
 	"io"
 	"mime"
 	"net/textproto"
+	"path/filepath"
 	"strings"
+	"time"
 )
 
-// Defaults from RFC 2045 5.2, "Content-Type defaults".
-var defaultMediaType, defaultContentParams, _ = mime.ParseMediaType("text/plain; charset=us-ascii")
+// rewriteOptions contains options used to control rewriteMessage's behavior.
+type rewriteOptions struct {
+	DeleteMediaTypes []string  `json:"deleteMediaTypes"` // globs for attachment media types to delete
+	KeepMediaTypes   []string  `json:"keepMediaTypes"`   // globs that override deleteMediaTypes
+	Now              time.Time `json:"now"`              // current time
+}
 
 // rewriteMessage reads an RFC 5322 (or RFC 2822, or RFC 822, sigh) message from
 // r and writes it to w.
-func rewriteMessage(r io.Reader, w io.Writer) error {
-	_, err := copyMessagePart(newLineReader(r), w, "")
+func rewriteMessage(r io.Reader, w io.Writer, opts *rewriteOptions) error {
+	_, err := copyMessagePart(newLineReader(r), w, "", opts)
 	return err
 }
 
 // copyMessagePart reads a message part consisting of a header, a blank line,
 // and a body from lr and writes it to w. The part can either be a full RFC 5322/2822/822
 // message or an RFC 2045/2046 message body part terminated by delim.
-func copyMessagePart(lr *lineReader, w io.Writer, delim string) (end bool, err error) {
-	hdata, err := copyHeader(lr, w)
+func copyMessagePart(lr *lineReader, w io.Writer, delim string,
+	opts *rewriteOptions) (end bool, err error) {
+	hdata, err := copyHeader(lr, w, opts)
 	if err != nil {
 		return false, err
 	}
 
-	if strings.HasPrefix(hdata.mediaType, "multipart/") {
+	if strings.HasPrefix(hdata.mediaType, "multipart/") && !hdata.deletePart {
 		// RFC 2046 5.1.1:
 		//  The only mandatory global parameter for the "multipart" media type is
 		//  the boundary parameter, which consists of 1 to 70 characters from a
@@ -60,14 +67,14 @@ func copyMessagePart(lr *lineReader, w io.Writer, delim string) (end bool, err e
 		//  similar to an RFC 822 message in syntax, but different in meaning.
 
 		// First, read the preamble (e.g. "This is a multi-part message in MIME format.").
-		if end, err := copyBody(lr, w, subDelim); err != nil {
+		if end, err := copyBody(lr, w, subDelim, false); err != nil {
 			return false, err
 		} else if !end {
 			// Next, copy the enclosed parts until we see the closing outer delimiter.
 			// TODO: Is it valid for the preamble to be immediately followed by a
 			// closing boundary delimiter?
 			for {
-				if end, err := copyMessagePart(lr, w, subDelim); err != nil {
+				if end, err := copyMessagePart(lr, w, subDelim, opts); err != nil {
 					return false, err
 				} else if end {
 					break
@@ -77,18 +84,22 @@ func copyMessagePart(lr *lineReader, w io.Writer, delim string) (end bool, err e
 	}
 
 	// Read the top-level body until we see the outer boundary.
-	return copyBody(lr, w, delim)
+	return copyBody(lr, w, delim, hdata.deletePart)
 }
 
 // headerData contains information parsed by copyHeader from a message part.
 type headerData struct {
-	mediaType     string            // media type from Content-Type , e.g. "text-plain" or "multipart/mixed"
+	mediaType     string            // media type from Content-Type , e.g. "text/plain" or "multipart/mixed"
 	contentParams map[string]string // additional parameters from Content-Type
+	deletePart    bool              // true if the message part should be deleted
 }
+
+// Defaults from RFC 2045 5.2, "Content-Type defaults".
+var defaultMediaType, defaultContentParams, _ = mime.ParseMediaType("text/plain; charset=us-ascii")
 
 // copyHeader reads the header portion of a message part from lr and writes it to w.
 // The trailing blank line at the end of the header is written before returning.
-func copyHeader(lr *lineReader, w io.Writer) (data headerData, err error) {
+func copyHeader(lr *lineReader, w io.Writer, opts *rewriteOptions) (data headerData, err error) {
 	data.mediaType = defaultMediaType
 	data.contentParams = defaultContentParams
 	gotContentType := false
@@ -122,26 +133,37 @@ func copyHeader(lr *lineReader, w io.Writer) (data headerData, err error) {
 				//  syntactically invalid Content-Type header field is encountered.
 				mtype = defaultMediaType
 				params = defaultContentParams
-
-				// TODO: Maybe still return an error for multipart?
-				//return data, fmt.Errorf("unparseable Content-Type %q: %v", val, err)
 			}
 
 			data.mediaType = mtype
 			data.contentParams = params
 			gotContentType = true
 
-			// TODO: If we see a media type indicating that the part should be dropped,
-			// replace it with something like this (copying what mutt does when deleting
-			// an attachment):
-			//
-			//  Content-Type: message/external-body; access-type=x-mutt-deleted;
-			//          expiration="Mon, 6 Jan 2020 16:51:39 -0400"; length=340416
-			//
-			// Then add a blank line and write the rest of the headers as the part's body,
-			// skip the original body, but still write the terminating delimiter.
-			//
-			// message/external-body is described in RFC 1341 7.3.3.
+			if data.deletePart, err = shouldDelete(data.mediaType, opts.DeleteMediaTypes,
+				opts.KeepMediaTypes); err != nil {
+				return data, err
+			} else if data.deletePart {
+				// Determine whether the message is using CRLF or just LF to end lines.
+				term := "\n"
+				if strings.HasSuffix(folded[0], "\r\n") {
+					term = "\r\n"
+				}
+
+				// This is patterned after what mutt does when deleting an attachment.
+				// It adds a header field like the following, followed by a blank line
+				// (to end the header and start the body) and the rest of the original headers:
+				//
+				//  Content-Type: message/external-body; access-type=x-mutt-deleted;
+				//          expiration="Mon, 6 Jan 2020 16:51:39 -0400"; length=340416
+				//
+				// message/external-body is described in RFC 1341 7.3.3.
+				if _, err := io.WriteString(
+					w, "Content-Type: message/external-body; access-type=x-rendmail-deleted;"+term+
+						"\texpiration=\""+opts.Now.Format(time.RFC1123Z)+"\""+term+
+						term); err != nil {
+					return data, err
+				}
+			}
 		}
 
 		for _, ln := range folded {
@@ -154,10 +176,12 @@ func copyHeader(lr *lineReader, w io.Writer) (data headerData, err error) {
 
 // copyBody reads lines from lr and writes them to w until it finds delim
 // at the beginning of a line. The delimiter line is written before returning.
+// If deletePart is true, all lines up to but not including the delimiter are
+// dropped instead of being written to w.
 //
 // The returned end value is true if the delimiter was suffixed by "--" or if delim is empty and
 // EOF was encountered. If delim is non-empty and EOF is encountered, an error is returned.
-func copyBody(lr *lineReader, w io.Writer, delim string) (end bool, err error) {
+func copyBody(lr *lineReader, w io.Writer, delim string, deletePart bool) (end bool, err error) {
 	for {
 		ln, err := lr.readLine()
 		if err == io.EOF {
@@ -175,10 +199,13 @@ func copyBody(lr *lineReader, w io.Writer, delim string) (end bool, err error) {
 			return false, err
 		}
 
-		if _, err := io.WriteString(w, ln); err != nil {
-			return false, err
+		isDelim := delim != "" && strings.HasPrefix(ln, delim)
+		if !deletePart || isDelim {
+			if _, err := io.WriteString(w, ln); err != nil {
+				return false, err
+			}
 		}
-		if delim != "" && strings.HasPrefix(ln, delim) {
+		if isDelim {
 			end := strings.HasPrefix(ln[len(delim):], "--")
 			return end, nil
 		}
@@ -205,4 +232,24 @@ func parseHeaderField(ln string) (key, val string, err error) {
 	val = strings.TrimLeft(ln[idx+1:], " \t")
 
 	return key, val, nil
+}
+
+// shouldDelete returns true if attachments of type mtype should be deleted.
+// del and keep are patterns corresponding to deleteMediaTypes and keepMediaTypes in rewriteOptions.
+func shouldDelete(mtype string, del, keep []string) (bool, error) {
+	for _, dp := range del {
+		if dm, err := filepath.Match(dp, mtype); err != nil {
+			return false, err
+		} else if dm {
+			for _, kp := range keep {
+				if km, err := filepath.Match(kp, mtype); err != nil {
+					return false, err
+				} else if km {
+					return false, nil // in keep
+				}
+			}
+			return true, nil // matched by del and not by keep
+		}
+	}
+	return false, nil // not matched by del
 }
