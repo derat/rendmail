@@ -1,4 +1,3 @@
-From exmh-workers-admin@redhat.com  Thu Aug 22 12:36:23 2002
 Return-Path: <exmh-workers-admin@spamassassin.taint.org>
 Delivered-To: zzzz@localhost.netnoteinc.com
 Received: from localhost (localhost [127.0.0.1])

@@ -156,7 +156,7 @@ func copyHeader(lr *lineReader, w io.Writer, opts *rewriteOptions) (data headerD
 				//  Content-Type: message/external-body; access-type=x-mutt-deleted;
 				//          expiration="Mon, 6 Jan 2020 16:51:39 -0400"; length=340416
 				//
-				// message/external-body is described in RFC 1341 7.3.3.
+				// message/external-body is described in RFC 1521 7.3.3 (replacing RFC 1341 7.3.3).
 				if _, err := io.WriteString(
 					w, "Content-Type: message/external-body; access-type=x-rendmail-deleted;"+term+
 						"\texpiration=\""+opts.Now.Format(time.RFC1123Z)+"\""+term+

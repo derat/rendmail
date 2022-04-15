@@ -20,13 +20,22 @@ func main() {
 		flag.PrintDefaults()
 	}
 	backupDir := flag.String("backup-dir", "", "Directory to which original, unmodified message will be saved")
-	deleteBinary := flag.Bool("delete-binary", false, "Delete binary attachments from messages")
-	deleteTypes := flag.String("delete-types", "", "Comma-separated globs matching attachment media types to delete")
+	deleteBinary := flag.Bool("delete-binary", false, "Delete common binary attachments from message")
+	deleteTypes := flag.String("delete-types", "", "Comma-separated globs of attachment media types to delete")
+	fakeNow := flag.String("fake-now", "", "Hardcoded RFC 3339 time (only used for testing)")
 	keepTypes := flag.String("keep-types", "", "Comma-separated glob overrides for -delete-types")
 	flag.Parse()
 
 	os.Exit(func() (code int) {
 		now := time.Now()
+		if *fakeNow != "" {
+			var err error
+			if now, err = time.Parse(time.RFC3339, *fakeNow); err != nil {
+				fmt.Fprintln(os.Stderr, "Bad -fake-now time:", err)
+				return 2
+			}
+		}
+
 		input := io.Reader(os.Stdin)
 
 		if *backupDir != "" {
