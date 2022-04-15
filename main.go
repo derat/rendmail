@@ -36,7 +36,7 @@ func main() {
 			defer func() {
 				// Drain the reader to write the unread portion of the message to the file
 				// in case rewriteMessage encountered an error.
-				if _, err := io.Copy(io.Discard, input); err != nil {
+				if _, err := io.Copy(ioutil.Discard, input); err != nil {
 					fmt.Fprintf(os.Stderr, "Failed copying message to %v: %v\n", f.Name(), err)
 					code = 1
 				}
