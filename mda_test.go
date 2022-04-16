@@ -59,6 +59,11 @@ func runMDATest(t *testing.T, cfgTmpl string, cmdFunc func(cfg string) *exec.Cmd
 		cf.Close()
 		t.Fatal("Executing template failed:", err)
 	}
+	// fdm requires its config file to not be world-readable.
+	if err := cf.Chmod(0600); err != nil {
+		cf.Close()
+		t.Fatal(err)
+	}
 	if err := cf.Close(); err != nil {
 		t.Fatal(err)
 	}
