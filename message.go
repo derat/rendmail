@@ -20,13 +20,24 @@ type rewriteOptions struct {
 	DeleteMediaTypes []string  `json:"deleteMediaTypes"` // globs for attachment media types to delete
 	KeepMediaTypes   []string  `json:"keepMediaTypes"`   // globs that override deleteMediaTypes
 	Now              time.Time `json:"now"`              // current time
+	Strict           bool      `json:"strict"`           // fail for bad messages
 	Verbose          bool      `json:"verbose"`          // write noisy messages to stderr
 }
 
 // rewriteMessage reads an RFC 5322 (or RFC 2822, or RFC 822, sigh) message from
 // r and writes it to w.
 func rewriteMessage(r io.Reader, w io.Writer, opts *rewriteOptions) error {
-	_, err := copyMessagePart(newLineReader(r), w, "", opts)
+	lr := newLineReader(r)
+	_, err := copyMessagePart(lr, w, "", opts)
+
+	// If we encountered a message error in non-strict mode, try to copy the rest of the message.
+	if _, ok := err.(*msgError); ok && !opts.Strict {
+		fmt.Fprintln(os.Stderr, "Ignoring error:", err)
+		if _, err := io.Copy(w, lr.r); err != nil {
+			return err
+		}
+		return nil
+	}
 	return err
 }
 
@@ -109,7 +120,7 @@ func copyHeader(lr *lineReader, w io.Writer, opts *rewriteOptions) (data headerD
 	for {
 		folded, unfolded, err := lr.readFoldedLine()
 		if err == io.EOF {
-			return data, errors.New("missing body")
+			return data, &msgError{"missing body"}
 		} else if err != nil {
 			return data, err
 		}
@@ -125,8 +136,14 @@ func copyHeader(lr *lineReader, w io.Writer, opts *rewriteOptions) (data headerD
 			return data, nil // done
 		}
 
+		var msgErr *msgError // returned later after writing the folded lines
 		if key, val, err := parseHeaderField(unfolded); err != nil {
-			return data, fmt.Errorf("malformed header field %q: %v", unfolded, err)
+			// This can happen if the blank line between the header and body is missing, resulting
+			// in us trying to parse a line from the body as a header. The only place that I've seen
+			// this is in some pre-2009 messages where I'd deleted attachments using mutt (did
+			// mutt's MIME implementation have a bug?). It also appears to be mentioned in
+			// https://bugzilla.mozilla.org/show_bug.cgi?id=335189.
+			msgErr = &msgError{fmt.Sprintf("malformed header field %q: %v", unfolded, err)}
 		} else if key == "Content-Type" && !gotContentType {
 			mtype, params, err := mime.ParseMediaType(val)
 			if err != nil {
@@ -180,6 +197,12 @@ func copyHeader(lr *lineReader, w io.Writer, opts *rewriteOptions) (data headerD
 				return data, err
 			}
 		}
+
+		// So that we'll still write the message in non-strict mode, only return an earlier
+		// message error after we've written the folded lines.
+		if msgErr != nil {
+			return data, msgErr
+		}
 	}
 }
 
@@ -194,16 +217,16 @@ func copyBody(lr *lineReader, w io.Writer, delim string, deletePart bool) (end b
 	for {
 		ln, err := lr.readLine()
 		if err == io.EOF {
-			if delim == "" {
-				return true, nil // done
-			} else {
-				// TODO: Should we be lenient in some cases, e.g. the outermost parts?
-				// For example, hard_ham/0142.0220f772ab37ba8d5899fc62f6878edf from the
-				// SpamAssassin corpus appears to be a multipart/alternative Oracle
-				// newsletter from 2002 that's missing an ending "--next_part_of_message--"
-				// delimiter.
-				return false, fmt.Errorf("EOF while looking for delimiter %q", delim)
+			if delim != "" {
+				// This happens if a multipart message is truncated or the final delimiter is
+				// missing for some reason.
+				//
+				// For example, hard_ham/0142.0220f772ab37ba8d5899fc62f6878edf from the SpamAssassin
+				// corpus appears to be a multipart/alternative Oracle newsletter from 2002 that's
+				// missing an ending "--next_part_of_message--" delimiter.
+				return false, &msgError{fmt.Sprintf("EOF while looking for delimiter %q", delim)}
 			}
+			return true, nil // done
 		} else if err != nil {
 			return false, err
 		}
@@ -244,7 +267,8 @@ func parseHeaderField(ln string) (key, val string, err error) {
 }
 
 // shouldDelete returns true if attachments of type mtype should be deleted.
-// del and keep are patterns corresponding to deleteMediaTypes and keepMediaTypes in rewriteOptions.
+// del and keep correspond to deleteMediaTypes and keepMediaTypes in rewriteOptions.
+// An error is only returned if an invalid glob is encountered.
 func shouldDelete(mtype string, del, keep []string) (bool, error) {
 	for _, dp := range del {
 		if dm, err := filepath.Match(dp, mtype); err != nil {
@@ -262,3 +286,9 @@ func shouldDelete(mtype string, del, keep []string) (bool, error) {
 	}
 	return false, nil // not matched by del
 }
+
+// msgError describes an error encountered within a message.
+// Regular error objects are used for errors encountered while reading or writing.
+type msgError struct{ text string }
+
+func (err *msgError) Error() string { return err.text }

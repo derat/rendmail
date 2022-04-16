@@ -1,0 +1,69 @@
+X-Gmail-Received: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+Delivered-To: user@example.org
+Received: by 10.36.82.15 with SMTP id f15cs176438nzb;
+        Sun, 15 May 2005 15:23:01 -0700 (PDT)
+Received: by 10.54.8.20 with SMTP id 20mr3164316wrh;
+        Sun, 15 May 2005 15:22:59 -0700 (PDT)
+Return-Path: <user@example.org>
+Received: from mail.phx2.nearlyfreespeech.net (c2.phx.nearlyfreespeech.net [199.1.92.202])
+        by mx.gmail.com with ESMTP id 34si7226wra.2005.05.15.15.22.48;
+        Sun, 15 May 2005 15:22:58 -0700 (PDT)
+Received-SPF: neutral (gmail.com: 199.1.92.202 is neither permitted nor denied by domain of user@example.org)
+DomainKey-Status: good (test mode)
+Received: from wproxy.gmail.com (wproxy.gmail.com [64.233.184.205])
+	by mail.phx2.nearlyfreespeech.net (Postfix) with ESMTP id 739E650B80
+	for <user@example.org>; Sun, 15 May 2005 15:22:42 -0700 (MST)
+Received: by wproxy.gmail.com with SMTP id 50so1760265wri
+        for <user@example.org>; Sun, 15 May 2005 15:22:41 -0700 (PDT)
+DomainKey-Signature: a=rsa-sha1; q=dns; c=nofws;
+        s=beta; d=gmail.com;
+        h=received:message-id:date:from:reply-to:to:subject:mime-version:content-type;
+        b=Tu1fchkVieMIBNOYLbr0EFhkwsHEuT1P9irgsX/zoqHla1n+rwu2rjW62Vhav1gVyvjff/etjMM4/PxurbAahLhw4vj1buoxcK8YOQZW5y2XyKYjL3w3VI/HWl99hijd3rKdcmCWNC10Ar7DrgE4rEPEnHS9iVhn/8Wzp69lzMY=
+Received: by 10.54.51.5 with SMTP id y5mr3248448wry;
+        Sun, 15 May 2005 15:22:40 -0700 (PDT)
+Received: by 10.54.38.17 with HTTP; Sun, 15 May 2005 15:22:39 -0700 (PDT)
+Message-ID: <xxxxxxxxxxxxxxxxxxxxxxxxxx@mail.gmail.com>
+Date: Sun, 15 May 2005 15:22:39 -0700
+From: Redacted <user@example.org>
+Reply-To: Redacted <user@example.org>
+To: Redacted <user@example.org>
+Subject: Redacted
+Mime-Version: 1.0
+Content-Type: multipart/mixed; 
+	boundary="----=_Part_6512_15772928.1116195759865"
+Content-Length: 1262
+------=_Part_6512_15772928.1116195759865
+Content-Type: text/plain; charset=ISO-8859-1
+Content-Transfer-Encoding: quoted-printable
+Content-Disposition: inline
+
+
+------=_Part_6512_15772928.1116195759865
+Content-Type: message/external-body; access-type=x-mutt-deleted;
+	expiration="Fri, 20 May 2005 00:41:24 -0700"; length=949884
+
+Content-Type: image/jpeg; name="DSCN4487.JPG"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="DSCN4487.JPG"
+
+
+------=_Part_6512_15772928.1116195759865
+Content-Type: message/external-body; access-type=x-mutt-deleted;
+	expiration="Fri, 20 May 2005 00:41:24 -0700"; length=1021157
+
+Content-Type: image/jpeg; name="DSCN4536.JPG"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="DSCN4536.JPG"
+
+
+------=_Part_6512_15772928.1116195759865
+Content-Type: message/external-body; access-type=x-mutt-deleted;
+	expiration="Fri, 20 May 2005 00:41:24 -0700"; length=961859
+
+Content-Type: image/jpeg; name="DSCN4592.JPG"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="DSCN4592.JPG"
+
+
+------=_Part_6512_15772928.1116195759865--
+

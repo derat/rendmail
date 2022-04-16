@@ -28,17 +28,12 @@ func TestRewriteMessage(t *testing.T) {
 
 	for _, p := range inPaths {
 		t.Run(p, func(t *testing.T) {
-			in, err := os.Open(p)
+			in, err := ioutil.ReadFile(p)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			base := p[:len(p)-len(suf)]
-			outPath := base + ".out.txt"
-			want, err := ioutil.ReadFile(outPath)
-			if err != nil {
-				t.Fatal(err)
-			}
 
 			var opts rewriteOptions
 			optsPath := base + ".opts.json"
@@ -53,18 +48,37 @@ func TestRewriteMessage(t *testing.T) {
 			}
 
 			var b bytes.Buffer
-			if err := rewriteMessage(in, &b, &opts); err != nil {
+			err = rewriteMessage(bytes.NewReader(in), &b, &opts)
+			if opts.Strict {
+				// Use the strict flag as a signal that we expect an error.
+				if err == nil {
+					t.Fatal("rewriteMessage unexpectedly succeeded in strict mode")
+				}
+				return
+			}
+			if err != nil {
 				t.Fatal("rewriteMessage failed:", err)
 			}
 			got := b.String()
+
+			outPath := base + ".out.txt"
+			want, err := ioutil.ReadFile(outPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			if got != string(want) {
 				cmd := exec.Command("diff", "-", outPath)
 				cmd.Stdin = &b
 				out, _ := cmd.Output()
 				t.Error("rewriteMessage produced unexpected output (got vs. want):\n" + string(out))
 			}
-			if err := checkTestMessage(strings.NewReader(got)); err != nil {
-				t.Error("rewriteMessage produced invalid message:", err)
+
+			// If the original message was valid, check that the rewritten one was too.
+			if err := checkTestMessage(bytes.NewReader(in)); err == nil {
+				if err := checkTestMessage(strings.NewReader(got)); err != nil {
+					t.Error("rewriteMessage produced invalid message:", err)
+				}
 			}
 		})
 	}

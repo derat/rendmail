@@ -26,7 +26,8 @@ func main() {
 	deleteTypes := flag.String("delete-types", "", "Comma-separated globs of attachment media types to delete")
 	fakeNow := flag.String("fake-now", "", "Hardcoded RFC 3339 time (only used for testing)")
 	keepTypes := flag.String("keep-types", "", "Comma-separated glob overrides for -delete-types")
-	flag.BoolVar(&opts.Verbose, "verbose", false, "Write informative messages to stderr")
+	flag.BoolVar(&opts.Strict, "strict", false, "Exit with status 1 for malformed message")
+	flag.BoolVar(&opts.Verbose, "verbose", false, "Write informative logging to stderr")
 
 	flag.Parse()
 

@@ -4,7 +4,8 @@ This directory contains email messages used to test the `rewriteMessage`
 function.
 
 Files with a `.in.txt` suffix are used as input, while corresponding `.out.txt`
-files contain expected output.
+files contain expected output. `.out.json` files contain JSON-marshaled
+`rewriteOptions` structs that are used to configure rewriting.
 
 File with an `sa_` prefix were downloaded from the [SpamAssassin corpus] on
 2022-04-13. Leading non-header `From` envelope lines were manually deleted when

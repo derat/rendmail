@@ -51,8 +51,10 @@ Reads an email message from stdin and rewrites it to stdout.
         Hardcoded RFC 3339 time (only used for testing)
   -keep-types string
         Comma-separated glob overrides for -delete-types
+  -strict
+        Exit with status 1 for malformed message
   -verbose
-        Write informative messages to stderr
+        Write informative logging to stderr
 ```
 
 **Rewriting email is scary.** You may want to initially pass `-backup-dir
