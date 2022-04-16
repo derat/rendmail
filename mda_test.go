@@ -13,18 +13,20 @@ import (
 )
 
 const (
-	procmailMsg  = "testdata/sa_easy_ham_2_00869.0fbb783356f6875063681dc49cfcb1eb-delete"
-	procmailDate = "2021-02-18T21:54:42.123Z" // matches .opts.json file
+	mdaMsg  = "testdata/sa_easy_ham_2_00869.0fbb783356f6875063681dc49cfcb1eb-delete"
+	mdaDate = "2021-02-18T21:54:42.123Z" // matches .opts.json file
 )
 
-func TestProcmail(t *testing.T) {
+// runMDATest uses a mail delivery agent to perform end-to-end testing.
+func runMDATest(t *testing.T, cfgTmpl string, cmdFunc func(cfg string) *exec.Cmd) {
 	rp, err := exec.LookPath("rendmail")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Create directories for procmail.
 	td := t.TempDir()
+
+	// Create directories for the MDA and rendmail to write to.
 	bdir := filepath.Join(td, "backup")
 	if err := os.Mkdir(bdir, 0755); err != nil {
 		t.Fatal(err)
@@ -34,9 +36,9 @@ func TestProcmail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Write the .procmailrc file.
-	tmpl := template.Must(template.New("rc").Parse(strings.TrimLeft(procmailrcTemplate, "\n")))
-	cp := filepath.Join(td, ".procmailrc")
+	// Write the MDA's config file.
+	tmpl := template.Must(template.New("cfg").Parse(strings.TrimLeft(cfgTmpl, "\n")))
+	cp := filepath.Join(td, "config")
 	cf, err := os.Create(cp)
 	if err != nil {
 		t.Fatal(err)
@@ -48,9 +50,9 @@ func TestProcmail(t *testing.T) {
 		BackupDir    string
 		Inbox        string
 	}{
-		LogFile:      filepath.Join(td, "procmail.log"),
+		LogFile:      filepath.Join(td, "log"),
 		RendmailPath: rp,
-		FakeNow:      procmailDate,
+		FakeNow:      mdaDate,
 		BackupDir:    bdir,
 		Inbox:        inbox,
 	}); err != nil {
@@ -62,18 +64,18 @@ func TestProcmail(t *testing.T) {
 	}
 
 	// Open the source message file.
-	mp := procmailMsg + ".in.txt"
+	mp := mdaMsg + ".in.txt"
 	mf, err := os.Open(mp)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mf.Close()
 
-	// Run procmail.
-	cmd := exec.Command("procmail", "-m", cp)
+	// Run the MDA.
+	cmd := cmdFunc(cp)
 	cmd.Stdin = mf
 	if err := cmd.Run(); err != nil {
-		t.Fatal("procmail failed:", err)
+		t.Fatalf("%q failed: %v", strings.Join(cmd.Args, " "), err)
 	}
 
 	// Compares a single file in gotDir against wantPath.
@@ -91,8 +93,14 @@ func TestProcmail(t *testing.T) {
 			t.Errorf("%v doesn't match %v:\n%s", gotPath, wantPath, out)
 		}
 	}
-	compare(filepath.Join(inbox, "new"), procmailMsg+".out.txt") // modified message
-	compare(bdir, mp)                                            // original, backed-up message
+	compare(filepath.Join(inbox, "new"), mdaMsg+".out.txt") // modified message
+	compare(bdir, mp)                                       // original, backed-up message
+}
+
+func TestProcmail(t *testing.T) {
+	runMDATest(t, procmailrcTemplate, func(cfg string) *exec.Cmd {
+		return exec.Command("procmail", "-m", cfg)
+	})
 }
 
 const procmailrcTemplate = `
@@ -104,4 +112,19 @@ LOGFILE={{.LogFile}}
 
 :0
 {{.Inbox}}/
+`
+
+func TestFDM(t *testing.T) {
+	runMDATest(t, fdmConfTemplate, func(cfg string) *exec.Cmd {
+		return exec.Command("fdm", "-vv", "-m", "-f", cfg, "fetch")
+	})
+}
+
+const fdmConfTemplate = `
+set no-received
+account "stdin" stdin
+match all
+      action rewrite "{{.RendmailPath}} -delete-binary -fake-now={{.FakeNow}} -backup-dir={{.BackupDir}} -verbose"
+      continue
+match all action maildir "{{.Inbox}}"
 `
