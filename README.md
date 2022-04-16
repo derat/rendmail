@@ -5,12 +5,12 @@
 > **[rend]** _(transitive verb)_: To separate into parts with force or sudden
 > violence; to split; to burst
 
-`rendmail` is a command-line program that reads an email message from stdin and
+rendmail is a command-line program that reads an email message from stdin and
 writes it (possibly with modifications) to stdout. It can be executed by a
 [message delivery agent] like [procmail] or [fdm] to remove binary attachments
 from messages before they are delivered.
 
-`rendmail` aims to be fast and minimally intrusive (contrary to its name).
+rendmail aims to be fast and minimally intrusive (contrary to its name).
 Messages are read into memory one line at a time and are not written to disk,
 and the original bytes are unmodified to the full extent possible.
 
@@ -32,7 +32,7 @@ from messages, so I decided to write my own.
 
 ## Usage
 
-`rendmail` can be compiled and installed by first [installing Go] and then
+rendmail can be compiled and installed by first [installing Go] and then
 running `go install` from the root of this repository.
 
 The `rendmail` executable accepts various command-line flags:
@@ -56,10 +56,10 @@ Reads an email message from stdin and rewrites it to stdout.
 ```
 
 **Rewriting email is scary.** You may want to initially pass `-backup-dir
-/some/path` to `rendmail` to save unmodified copies of messages to a temporary
+/some/path` to rendmail to save unmodified copies of messages to a temporary
 location in case something goes wrong.
 
-Please file an issue if you encounter messages that `rendmail` has trouble
+Please file an issue if you encounter messages that rendmail has trouble
 processing.
 
 [installing Go]: https://go.dev/doc/install
@@ -67,8 +67,8 @@ processing.
 ### procmail
 
 For [procmail], a recipe like the following can be added near the top of
-[.procmailrc] to pipe all messages through `rendmail` to remove binary
-attachments before other recipes are evaluated:
+[.procmailrc] to pipe all messages through rendmail to remove binary attachments
+before other recipes are evaluated:
 
 ```
 # h: Process message header
@@ -87,7 +87,7 @@ probably need to supply an absolute path or set `PATH` within `.procmailrc`.
 ### fdm
 
 For [fdm], the following rule can be added near the top of [.fdm.conf] to pipe
-all messages through `rendmail` to remove binary attachments:
+all messages through rendmail to remove binary attachments:
 
 ```
 match all
@@ -99,7 +99,7 @@ match all
 
 ## Further reading
 
-The following RFCs are relevant to `rendmail`:
+The following RFCs are relevant to rendmail:
 
 *   [RFC 5322]: Internet Message Format
     (supersedes [RFC 2822] and [RFC 822])
@@ -129,7 +129,7 @@ but it was closed.
 [net/textproto]: https://pkg.go.dev/net/textproto
 
 The `copy_delete_attach()` function in [mutt's copy.c file] looks like it's
-responsible for deleting attachments from multipart messages. `rendmail` follows
+responsible for deleting attachments from multipart messages. rendmail follows
 the approach used there:
 
 *   Replace the original `Content-Type` header field with one with media type
