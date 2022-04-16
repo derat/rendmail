@@ -155,6 +155,10 @@ Here are some related programs that I came across:
 *   [Demime] looks like it was another Perl script for convert messages into
     plain text for mailing lists. It's unsupported, as far as I can tell (its
     webpage no longer exists).
+*   [alterMIME] is a C program "used to alter your mime-encoded mailpacks as
+    typically received by Inflex, Xamime and AMaViS". I have to admit that I
+    still don't know what a mailpack is after multiple web searches. It looks
+    like the last release was in 2008.
 
 [MIMEDefang]: https://mimedefang.org/
 [milter]: https://en.wikipedia.org/wiki/Milter
@@ -163,6 +167,7 @@ Here are some related programs that I came across:
 [Email Sanitizer]: https://www.mailmunge.org/
 [Stripmime]: https://www.phred.org/~alex/stripmime.html
 [Demime]: http://web.archive.org/web/20070814043830/http://scifi.squawk.com/demime.html
+[alterMIME]: https://pldaniels.com/altermime/
 
 I found Enrico Zini's [Migrating from procmail to sieve] post to be interesting.
 It led me to Anarcat's [procmail considered harmful] page, which pointed me to
