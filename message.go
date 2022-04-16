@@ -9,6 +9,7 @@ import (
 	"io"
 	"mime"
 	"net/textproto"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ type rewriteOptions struct {
 	DeleteMediaTypes []string  `json:"deleteMediaTypes"` // globs for attachment media types to delete
 	KeepMediaTypes   []string  `json:"keepMediaTypes"`   // globs that override deleteMediaTypes
 	Now              time.Time `json:"now"`              // current time
+	Verbose          bool      `json:"verbose"`          // write noisy messages to stderr
 }
 
 // rewriteMessage reads an RFC 5322 (or RFC 2822, or RFC 822, sigh) message from
@@ -143,6 +145,10 @@ func copyHeader(lr *lineReader, w io.Writer, opts *rewriteOptions) (data headerD
 				opts.KeepMediaTypes); err != nil {
 				return data, err
 			} else if data.deletePart {
+				if opts.Verbose {
+					logf("Deleting part with media type %v", data.mediaType)
+				}
+
 				// Determine whether the message is using CRLF or just LF to end lines.
 				term := "\n"
 				if strings.HasSuffix(folded[0], "\r\n") {
@@ -252,4 +258,9 @@ func shouldDelete(mtype string, del, keep []string) (bool, error) {
 		}
 	}
 	return false, nil // not matched by del
+}
+
+// logf writes the supplied format string and args to stderr.
+func logf(msg string, args ...interface{}) {
+	fmt.Fprintf(os.Stderr, "rendmail: "+msg+"\n", args...)
 }

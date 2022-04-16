@@ -100,7 +100,7 @@ VERBOSE=on
 LOGFILE={{.LogFile}}
 
 :0 hbfw
-| {{.RendmailPath}} -delete-binary -fake-now={{.FakeNow}} -backup-dir={{.BackupDir}}
+| {{.RendmailPath}} -delete-binary -fake-now={{.FakeNow}} -backup-dir={{.BackupDir}} -verbose
 
 :0
 {{.Inbox}}/

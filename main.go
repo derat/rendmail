@@ -24,6 +24,7 @@ func main() {
 	deleteTypes := flag.String("delete-types", "", "Comma-separated globs of attachment media types to delete")
 	fakeNow := flag.String("fake-now", "", "Hardcoded RFC 3339 time (only used for testing)")
 	keepTypes := flag.String("keep-types", "", "Comma-separated glob overrides for -delete-types")
+	verbose := flag.Bool("verbose", false, "Write informative messages to stderr")
 	flag.Parse()
 
 	os.Exit(func() (code int) {
@@ -60,7 +61,7 @@ func main() {
 			}()
 		}
 
-		opts := rewriteOptions{Now: now}
+		opts := rewriteOptions{Now: now, Verbose: *verbose}
 		if *deleteBinary {
 			if *deleteTypes != "" || *keepTypes != "" {
 				fmt.Fprintln(os.Stderr, "-delete-binary is incompatible with -delete-types and -keep-types")
