@@ -14,6 +14,8 @@ import (
 )
 
 func main() {
+	opts := rewriteOptions{Now: time.Now()}
+
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [flag]...\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Reads an email message from stdin and rewrites it to stdout.\n\n")
@@ -24,25 +26,40 @@ func main() {
 	deleteTypes := flag.String("delete-types", "", "Comma-separated globs of attachment media types to delete")
 	fakeNow := flag.String("fake-now", "", "Hardcoded RFC 3339 time (only used for testing)")
 	keepTypes := flag.String("keep-types", "", "Comma-separated glob overrides for -delete-types")
-	verbose := flag.Bool("verbose", false, "Write informative messages to stderr")
+	flag.BoolVar(&opts.Verbose, "verbose", false, "Write informative messages to stderr")
+
 	flag.Parse()
 
 	os.Exit(func() (code int) {
-		now := time.Now()
 		if *fakeNow != "" {
 			var err error
-			if now, err = time.Parse(time.RFC3339, *fakeNow); err != nil {
+			if opts.Now, err = time.Parse(time.RFC3339, *fakeNow); err != nil {
 				fmt.Fprintln(os.Stderr, "Bad -fake-now time:", err)
 				return 2
 			}
 		}
 
-		input := io.Reader(os.Stdin)
+		if *deleteBinary {
+			if *deleteTypes != "" || *keepTypes != "" {
+				fmt.Fprintln(os.Stderr, "-delete-binary is incompatible with -delete-types and -keep-types")
+				return 2
+			}
+			opts.DeleteMediaTypes = binaryDeleteTypes
+			opts.KeepMediaTypes = binaryKeepTypes
+		} else {
+			opts.DeleteMediaTypes = splitList(*deleteTypes)
+			opts.KeepMediaTypes = splitList(*keepTypes)
+		}
 
+		input := io.Reader(os.Stdin)
 		if *backupDir != "" {
-			f, err := ioutil.TempFile(*backupDir, now.UTC().Format("20060102-150405.999")+"-*")
+			if err := os.MkdirAll(*backupDir, 0700); err != nil {
+				fmt.Fprintln(os.Stderr, "Failed creating backup dir:", err)
+				return 1
+			}
+			f, err := ioutil.TempFile(*backupDir, opts.Now.UTC().Format("20060102-150405.999")+"-*")
 			if err != nil {
-				fmt.Fprintln(os.Stderr, "Failed creating file:", err)
+				fmt.Fprintln(os.Stderr, "Failed creating backup file:", err)
 				return 1
 			}
 			input = io.TeeReader(input, f)
@@ -59,19 +76,6 @@ func main() {
 					code = 1
 				}
 			}()
-		}
-
-		opts := rewriteOptions{Now: now, Verbose: *verbose}
-		if *deleteBinary {
-			if *deleteTypes != "" || *keepTypes != "" {
-				fmt.Fprintln(os.Stderr, "-delete-binary is incompatible with -delete-types and -keep-types")
-				return 2
-			}
-			opts.DeleteMediaTypes = binaryDeleteTypes
-			opts.KeepMediaTypes = binaryKeepTypes
-		} else {
-			opts.DeleteMediaTypes = splitList(*deleteTypes)
-			opts.KeepMediaTypes = splitList(*keepTypes)
 		}
 
 		if err := rewriteMessage(input, os.Stdout, &opts); err != nil {
