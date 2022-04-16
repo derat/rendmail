@@ -130,6 +130,9 @@ func copyHeader(lr *lineReader, w io.Writer, opts *rewriteOptions) (data headerD
 		} else if key == "Content-Type" && !gotContentType {
 			mtype, params, err := mime.ParseMediaType(val)
 			if err != nil {
+				if opts.Verbose {
+					fmt.Fprintf(os.Stderr, "Ignoring invalid Content-Type %q: %v\n", val, err)
+				}
 				// RFC 2045 5.2:
 				//  It is also recommend that this default be assumed when a
 				//  syntactically invalid Content-Type header field is encountered.
