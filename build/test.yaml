@@ -1,0 +1,10 @@
+steps:
+  - name: golang
+    entrypoint: sh
+    args:
+      - '-c'
+      - |
+        apt-get update
+        apt-get install -y procmail
+        go install
+        go test -v ./...
