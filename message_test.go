@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -114,6 +115,66 @@ func checkTestMessage(r io.Reader) error {
 		return err
 	}
 	return checkPart(msg.Header, msg.Body)
+}
+
+func TestDecodeHeaderValue(t *testing.T) {
+	for _, tc := range []struct {
+		orig string
+		dec  string
+		ok   bool
+	}{
+		{"", "", true},
+		{" ", " ", true},
+		{"regular text", "regular text", true},
+		{"¡confirmación, 再见, hi!", "confirmacion, , hi!", true}, // diacritic removed, non-ASCII dropped
+		// Various examples from RFC 2047:
+		{"=?iso-8859-1?q?this=20is=20some=20text?=", "this is some text", true},
+		{"=?US-ASCII?Q?Keith_Moore?= <moore@cs.utk.edu>", "Keith Moore <moore@cs.utk.edu>", true},
+		{"=?ISO-8859-1?Q?Keld_J=F8rn_Simonsen?= <keld@dkuug.dk>", "Keld Jrn Simonsen <keld@dkuug.dk>", true}, // ø isn't diacritical
+		{"=?ISO-8859-1?Q?Andr=E9?= Pirard <PIRARD@vm1.ulg.ac.be>", "Andre Pirard <PIRARD@vm1.ulg.ac.be>", true},
+		{"=?ISO-8859-1?Q?Olle_J=E4rnefors?= <ojarnef@admin.kth.se>", "Olle Jarnefors <ojarnef@admin.kth.se>", true},
+		{"=?ISO-8859-1?Q?Patrik_F=E4ltstr=F6m?= <paf@nada.kth.se>", "Patrik Faltstrom <paf@nada.kth.se>", true},
+		{"(=?ISO-8859-1?Q?a?=)", "(a)", true},
+		{"(=?ISO-8859-1?Q?a?= b)", "(a b)", true},
+		{"(=?ISO-8859-1?Q?a?= =?ISO-8859-1?Q?b?=)", "(ab)", true},
+		{"(=?ISO-8859-1?Q?a?=  =?ISO-8859-1?Q?b?=)", "(ab)", true},
+		{"(=?ISO-8859-1?Q?a?=\r\n    =?ISO-8859-1?Q?b?=)", "(ab)", true}, // we shouldn't actually pass line breaks
+		{"(=?ISO-8859-1?Q?a_b?=)", "(a b)", true},
+		{"(=?ISO-8859-1?Q?a?= =?ISO-8859-2?Q?_b?=)", "", false}, // unsupported charset
+	} {
+		if dec, ok := decodeHeaderValue(tc.orig); dec != tc.dec || ok != tc.ok {
+			t.Errorf("decodeHeaderValue(%q) = (%q, %v); want (%q, %v)", tc.orig, dec, ok, tc.dec, tc.ok)
+		}
+	}
+}
+
+func TestFoldHeaderField(t *testing.T) {
+	var (
+		a38 = strings.Repeat("a", 38)
+		a69 = strings.Repeat("a", 69) // 78 chars when preceded by "Subject: "
+		a70 = strings.Repeat("a", 70) // 79 chars when preceded by "Subject: "
+		a78 = strings.Repeat("a", 78) // always exceeds limit when preceded by "Subject: " or " "
+	)
+
+	for _, tc := range []struct {
+		unfolded string
+		term     string
+		want     []string
+	}{
+		{"", "\n", nil},  // we shouldn't pass an empty string
+		{" ", "\n", nil}, // we shouldn't pass just whitespace
+		{"From: me", "\n", []string{"From: me\n"}},
+		{"Subject: Some words", "\r\n", []string{"Subject: Some words\r\n"}},
+		{"Subject: " + a69, "\n", []string{"Subject: " + a69 + "\n"}},
+		{"Subject: " + a70, "\n", []string{"Subject:\n", " " + a70 + "\n"}},
+		{"Subject: " + a69 + "\t" + a38 + " " + a38 + " " + a38, "\n",
+			[]string{"Subject: " + a69 + "\n", "\t" + a38 + " " + a38 + "\n", " " + a38 + "\n"}},
+		{"Subject: " + a78 + " " + a78, "\n", []string{"Subject:\n", " " + a78 + "\n", " " + a78 + "\n"}},
+	} {
+		if got := foldHeaderField(tc.unfolded, tc.term); !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("foldHeaderField(%q, %q) = %q; want %q", tc.unfolded, tc.term, got, tc.want)
+		}
+	}
 }
 
 func TestShouldDelete(t *testing.T) {

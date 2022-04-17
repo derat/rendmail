@@ -65,7 +65,9 @@ func (lr *lineReader) readFoldedLine() (folded []string, unfolded string, err er
 	}
 
 	// TODO: Limit how long the unfolded line can be? I don't see any hard
-	// limits in the RFC, though.
+	// limits in the RFC, though. RFC 5322 2.2.3:
+	//  An unfolded header field has no length restriction and therefore
+	//  may be indeterminately long.
 	for {
 		if next, err := lr.r.Peek(1); err == io.EOF {
 			return folded, unfolded, nil // input ends after newline

@@ -11,8 +11,15 @@ import (
 	"net/textproto"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
+	"unicode"
+
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 )
 
 // rewriteOptions contains options used to control rewriteMessage's behavior.
@@ -20,6 +27,7 @@ type rewriteOptions struct {
 	DeleteMediaTypes []string  `json:"deleteMediaTypes"` // globs for attachment media types to delete
 	KeepMediaTypes   []string  `json:"keepMediaTypes"`   // globs that override deleteMediaTypes
 	Now              time.Time `json:"now"`              // current time
+	DecodeSubject    bool      `json:"decodeSubject"`    // decode Subject header field to X-Rendmail-Subject
 	Strict           bool      `json:"strict"`           // fail for bad messages
 	Verbose          bool      `json:"verbose"`          // write noisy messages to stderr
 }
@@ -113,6 +121,8 @@ var defaultMediaType, defaultContentParams, _ = mime.ParseMediaType("text/plain;
 // copyHeader reads the header portion of a message part from lr and writes it to w.
 // The trailing blank line at the end of the header is written before returning.
 func copyHeader(lr *lineReader, w io.Writer, opts *rewriteOptions) (data headerData, err error) {
+	var term string // message's line terminator (either "\r\n" or "\n")
+
 	data.mediaType = defaultMediaType
 	data.contentParams = defaultContentParams
 	gotContentType := false
@@ -125,6 +135,15 @@ func copyHeader(lr *lineReader, w io.Writer, opts *rewriteOptions) (data headerD
 			return data, err
 		}
 
+		// Use the first line to determine whether the message is using CRLF or just LF.
+		if term == "" {
+			if strings.HasSuffix(folded[0], "\r\n") {
+				term = "\r\n"
+			} else {
+				term = "\n"
+			}
+		}
+
 		// A blank line indicates the end of the header.
 		if unfolded == "" {
 			if len(folded) != 1 {
@@ -135,6 +154,8 @@ func copyHeader(lr *lineReader, w io.Writer, opts *rewriteOptions) (data headerD
 			}
 			return data, nil // done
 		}
+
+		var newLines []string // new lines to write after this one
 
 		var msgErr *msgError // returned later after writing the folded lines
 		if key, val, err := parseHeaderField(unfolded); err != nil {
@@ -169,12 +190,6 @@ func copyHeader(lr *lineReader, w io.Writer, opts *rewriteOptions) (data headerD
 					fmt.Fprintln(os.Stderr, "Deleting "+data.mediaType)
 				}
 
-				// Determine whether the message is using CRLF or just LF to end lines.
-				term := "\n"
-				if strings.HasSuffix(folded[0], "\r\n") {
-					term = "\r\n"
-				}
-
 				// This is patterned after what mutt does when deleting an attachment.
 				// It adds a header field like the following, followed by a blank line
 				// (to end the header and start the body) and the rest of the original headers:
@@ -190,9 +205,20 @@ func copyHeader(lr *lineReader, w io.Writer, opts *rewriteOptions) (data headerD
 					return data, err
 				}
 			}
+		} else if key == "Subject" && opts.DecodeSubject {
+			if dec, ok := decodeHeaderValue(val); ok && dec != "" && dec != val {
+				// Just to mention it, RFC 6648 advocates avoiding "X-" headers, and they were
+				// actually removed for email in RFC 2822 (after being described by RFC 822).
+				newLines = append(newLines, foldHeaderField("X-Rendmail-Subject: "+dec, term)...)
+			}
 		}
 
 		for _, ln := range folded {
+			if _, err := io.WriteString(w, ln); err != nil {
+				return data, err
+			}
+		}
+		for _, ln := range newLines {
 			if _, err := io.WriteString(w, ln); err != nil {
 				return data, err
 			}
@@ -265,6 +291,72 @@ func parseHeaderField(ln string) (key, val string, err error) {
 
 	return key, val, nil
 }
+
+// decodeHeaderValue attempts to convert an RFC 2047 header value to 7-bit ASCII.
+// The returned bool is false if the conversion failed (e.g. the original value
+// used an unsupported charset). Any non-ASCII characters left after decoding and
+// conversion are dropped.
+func decodeHeaderValue(unfolded string) (string, bool) {
+	// First, try to decode from the RFC 2047 form (i.e. Quoted-Printable or base64).
+	dec, err := headerDecoder.DecodeHeader(unfolded)
+	if err != nil {
+		return "", false
+	}
+	// Next, remove accents and then drop anything that's not 7-bit ASCII.
+	res, _, err := transform.String(headerTransformChain, dec)
+	return res, err == nil
+}
+
+// These are used by decodeHeaderValue.
+var headerDecoder = mime.WordDecoder{
+	// By default, WordDecoder only supports the utf-8, iso-8859-1 and us-ascii charsets.
+	CharsetReader: func(charset string, input io.Reader) (io.Reader, error) {
+		switch {
+		case strings.EqualFold("windows-1252", charset):
+			return charmap.Windows1252.NewDecoder().Reader(input), nil
+		default:
+			return nil, fmt.Errorf("unhandled charset %q", charset)
+		}
+	},
+}
+var headerTransformChain = transform.Chain(
+	norm.NFD,                           // decompose by canonical equivalence
+	runes.Remove(runes.In(unicode.Mn)), // remove "Mark, nonspacing"
+	norm.NFC,                           // recompose by canonical equivalence
+	runes.Remove(runes.Predicate(func(r rune) bool { // remove non-printable ASCII
+		// From RFC 5322 2.2:
+		//  A field name MUST be composed of printable US-ASCII characters (i.e., characters
+		//  that have values between 33 and 126, inclusive), except colon.  A field body may be
+		//  composed of printable US-ASCII characters as well as the space (SP, ASCII value 32)
+		//  and horizontal tab (HTAB, ASCII value 9) characters (together known as the white
+		//  space characters, WSP).
+		return (r < 32 || r > 126) && r != 9
+	})),
+)
+
+// foldHeaderField wraps unfolded across multiple lines, each of which will be terminated
+// with term ("\r\n" or "\n"). See RFC 5322 2.2.3.
+func foldHeaderField(unfolded, term string) []string {
+	var folded []string
+	for _, p := range foldRegexp.FindAllString(unfolded, -1) {
+		if len(folded) == 0 {
+			folded = append(folded, p)
+		} else if len(folded[len(folded)-1])+len(p) <= 78 {
+			folded[len(folded)-1] += p
+		} else {
+			folded[len(folded)-1] += term
+			folded = append(folded, p)
+		}
+	}
+	if len(folded) > 0 {
+		folded[len(folded)-1] += term
+	}
+	return folded
+}
+
+// foldRegexp matches any number of space or tab characters followed by one or more
+// non-space/tab characters.
+var foldRegexp = regexp.MustCompile(`[ \t]*[^ \t]+`)
 
 // shouldDelete returns true if attachments of type mtype should be deleted.
 // del and keep correspond to deleteMediaTypes and keepMediaTypes in rewriteOptions.

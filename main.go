@@ -22,6 +22,7 @@ func main() {
 		flag.PrintDefaults()
 	}
 	backupDir := flag.String("backup-dir", "", "Directory to which original, unmodified message will be saved")
+	flag.BoolVar(&opts.DecodeSubject, "decode-subject", false, "Write X-Rendmail-Subject for RFC-2047-encoded Subject")
 	deleteBinary := flag.Bool("delete-binary", false, "Delete common binary attachments from message")
 	deleteTypes := flag.String("delete-types", "", "Comma-separated globs of attachment media types to delete")
 	fakeNow := flag.String("fake-now", "", "Hardcoded RFC 3339 time (only used for testing)")

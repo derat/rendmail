@@ -1,0 +1,121 @@
+Delivered-To: user@example.org
+Received: by 2002:a4a:d881:0:0:0:0:0 with SMTP id b1csp809147oov;
+        Sat, 16 Apr 2022 09:33:46 -0700 (PDT)
+X-Received: by 2002:aa7:c4da:0:b0:41d:5866:4dfb with SMTP id p26-20020aa7c4da000000b0041d58664dfbmr4410878edr.117.1650126826325;
+        Sat, 16 Apr 2022 09:33:46 -0700 (PDT)
+ARC-Seal: i=2; a=rsa-sha256; t=1650126826; cv=pass;
+        d=google.com; s=arc-20160816;
+        b=wwhgcrZLXwOGk91tbIRl6G7XLOmMY4jx8euS9iG3A3xSlyxYSdLes/Wa3qkruaIFHq
+         nOg6Ygg5mjI2r4Wo52KABOod7ilWmzakhqNoPR4nI/mKXCxHJ/fy0wuLbl6LCal1KzDy
+         rJoeXdAM4gVNUitCQjg7Sa6s65ZsfkLXEdBteiksJjXfUjHTGuT91yHyOMBzkkJxlJKU
+         gJqf4kgPq0YvLjJVvP+oAEzuZ4TQn/qyJ13sFNwglikU/Z60b3PWLTQQUjgRd8cBiJ+h
+         ujUrG+iJ/ZlAGSm2Oq7IIDcnDviFuvLydMt77B+ICcO+TSIivl/avX+0vd389z//1hEe
+         WaDg==
+ARC-Message-Signature: i=2; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20160816;
+        h=to:subject:message-id:date:from:mime-version:dkim-signature;
+        bh=15GzugeF30lkrUmoV567n9y74SBRII5H0rVtr4odJvM=;
+        b=PBgRMRnPyQU8V6VdrXWlaEGDSt4ibkHhd2o8BiZgzlDpu9MhFLZ+wu47gZB9SEqbi9
+         ReIecYl7QY1szP6lqctDTpBKHaYx2aYTBMPEBrh1t4VzZyzGE5nX7V8+7DlomKRGs0aw
+         L5em9f9fBREu0n44TcHBsBEjLhVfYPoIMa1WA0NE3jlTdC7qwbx/S7uO6PqskIGJbK9b
+         bcejJu7EfgZLnnzrR911rjRIrLOnrPir0Fq/ERqO2ZbjSi9MKYimjWGBqpxPu/dof7v6
+         15uhT7FUcB/dQ7poD3hDrfjQhEEHjsxu2alzLXZtEY5GWPQl3udC78zIX5jBh8ifHv1t
+         rRDg==
+ARC-Authentication-Results: i=2; mx.google.com;
+       dkim=pass header.i=@gmail.com header.s=20210112 header.b=JUlBo7I2;
+       arc=pass (i=1 spf=pass spfdomain=gmail.com dkim=pass dkdomain=gmail.com dmarc=pass fromdomain=gmail.com);
+       spf=pass (google.com: domain of user@example.org designates 209.85.220.41 as permitted sender) smtp.mailfrom=user@example.org;
+       dmarc=pass (p=NONE sp=QUARANTINE dis=NONE) header.from=gmail.com
+Return-Path: <user@example.org>
+Received: from mail-sor-f41.google.com (mail-sor-f41.google.com. [209.85.220.41])
+        by mx.google.com with SMTPS id ee29-20020a056402291d00b0041eafd3dadcsor2624152edb.52.2022.04.16.09.33.46
+        for <user@example.org>
+        (Google Transport Security);
+        Sat, 16 Apr 2022 09:33:46 -0700 (PDT)
+Received-SPF: pass (google.com: domain of user@example.org designates 209.85.220.41 as permitted sender) client-ip=209.85.220.41;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@gmail.com header.s=20210112 header.b=JUlBo7I2;
+       arc=pass (i=1 spf=pass spfdomain=gmail.com dkim=pass dkdomain=gmail.com dmarc=pass fromdomain=gmail.com);
+       spf=pass (google.com: domain of user@example.org designates 209.85.220.41 as permitted sender) smtp.mailfrom=user@example.org;
+       dmarc=pass (p=NONE sp=QUARANTINE dis=NONE) header.from=gmail.com
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=1e100.net; s=20210112;
+        h=x-gm-message-state:dkim-signature:mime-version:from:date:message-id
+         :subject:to;
+        bh=15GzugeF30lkrUmoV567n9y74SBRII5H0rVtr4odJvM=;
+        b=lFHUTU5u2610ndAAWli+8K0vWF6njaQ+6njJh9IJ6o/Bl5AcpE5/tTEstPHO6BEk9D
+         cQ1pRWEYZvrH4TD+mxfBPvWlzwU08oBTnvJBZ1GOP44Ol+yDjOmXcyftE/jsM+tLxcaz
+         SGJVRWE1Wdqy9haR4+DfA5O1PgDhUfl2sGFiyZs/Ut5OYIM2hhzVK0Xj8jwP+68KxNS8
+         IxvyZYu3UX8L8/xf+vuEBylu6tw72mROk1Lz4mivW3kOB56fx/yylNiF8s1SDmor8MDY
+         Xj/ME+4XRBKwCPYWS+X/1trrD6s7PitR+5xE5PqILjIVT2Ly9XN7x59f4Vz5ERN5m9/f
+         TZyQ==
+X-Gm-Message-State: AOAM532eRGvaBTB0iRAwioQLRn/uFRGTPFIty4JpfpH65tI7e5q9sshH
+	ABKFyeNvjT87Zbfrf+LCR/MpEfyDVzj60sHcFw==
+X-Google-Smtp-Source: ABdhPJxu1HiTq1BC/LOHabT79QUXAtwYvJyKPjkfA7bDiwuUdqY/2x7+BuujqokZrFfxldL+WbMYXkF+bhJVg/Mq7uk7MQ+ukzI=
+X-Received: by 2002:a05:6402:274e:b0:419:81a1:ed9b with SMTP id z14-20020a056402274e00b0041981a1ed9bmr4393448edd.9.1650126826119;
+        Sat, 16 Apr 2022 09:33:46 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1650126826; cv=none;
+        d=google.com; s=arc-20160816;
+        b=ovjkGanWjACD+BWACG1ln5n6pcG89w+aT99Wo0rx6HBxc/VZDaXH9fp7jN3U5SRwrZ
+         Fn2LU70kvqr3cnUVF+bru06iyvHEtp9srDHnWOebDP0hn69Xtr8BTuU7C4HotsQ4RE1a
+         Uily2WOjuVixxbZCWt7lnQcf+QZWqpyQ9t/U8aDHAHpX+od1c74z1Fm1rtMARMD9gdeF
+         898GAJP/I5Am6pc5vqqxH66jUQrzYWk0pnvtPH3oJLzh+qwbgqVUCRk/zjT2vN0wszV3
+         IFrAfU6ncXu0gh3NheVmRM29gFY5phdFtI+mKBYlQF8JAZVPb+NN1kB/ImgooQMWjA2J
+         rd3A==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20160816;
+        h=to:subject:message-id:date:from:mime-version:dkim-signature;
+        bh=15GzugeF30lkrUmoV567n9y74SBRII5H0rVtr4odJvM=;
+        b=ihZyveyU2MtcFKl5Pb2aAqHulHRMGJ5Zo+cue9afPmVrBLIT89uoiWOstHmlA0FzXp
+         OcOVZgFuecltdc0jNdQJP1mgWrNuyYR6LxKyxoFBPtUofjagrt0ZC4SHljGrwDVJ83KC
+         +hNverLXgGDScBBQiMbE1NLhggtHZTlWW/3aity496MoS2v7dM+yu/guxzte6ePSKMBS
+         es94qn+zSU+lvuZSapDZf4ESYrlwHTrnABT8WpihAas6iUKmQvNV+mpb5E45Mf2xil2v
+         RFjK/nupxMCzzrH+4eMX2HEx4kaDWf7U3mzFv5IroHlATVlkQ2THwpM2bGkgg8Em6YE3
+         c7qw==
+ARC-Authentication-Results: i=1; gmr-mx.google.com;
+       dkim=pass header.i=@gmail.com header.s=20210112 header.b=JUlBo7I2;
+       spf=pass (google.com: domain of user@example.org designates 2a00:1450:4864:20::631 as permitted sender) smtp.mailfrom=user@example.org;
+       dmarc=pass (p=NONE sp=QUARANTINE dis=NONE) header.from=gmail.com
+Return-Path: <user@example.org>
+Received: from mail-ej1-x631.google.com (mail-ej1-x631.google.com. [2a00:1450:4864:20::631])
+        by gmr-mx.google.com with ESMTPS id d9-20020a1709063ec900b006e89250c574si160654ejj.2.2022.04.16.09.33.46
+        for <user@example.org>
+        (version=TLS1_3 cipher=TLS_AES_128_GCM_SHA256 bits=128/128);
+        Sat, 16 Apr 2022 09:33:46 -0700 (PDT)
+Received-SPF: pass (google.com: domain of user@example.org designates 2a00:1450:4864:20::631 as permitted sender) client-ip=2a00:1450:4864:20::631;
+Received: by mail-ej1-x631.google.com with SMTP id y10so2788976ejw.8
+        for <user@example.org>; Sat, 16 Apr 2022 09:33:46 -0700 (PDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+        d=gmail.com; s=20210112;
+        h=mime-version:from:date:message-id:subject:to;
+        bh=15GzugeF30lkrUmoV567n9y74SBRII5H0rVtr4odJvM=;
+        b=JUlBo7I2OAc9u+c/c+f6ha4d1uSYFGrr9AGwKPeLPZMN8wpHqSixDmu0S9Wo8EcBO9
+         QXjIZHplgNQQBa4FAAuHkMoNK+ExXCFmjTU1ycwk5Wx1mvxvOjw7y2RO1IWr/xhAYc3B
+         GFvJVdsDQigCk+3T5afINeDSg+n8c13DPyt5cxgX+pUSSpeY8FFrXxmD07OdeiHJful8
+         2nW3uZSaUgSnHlD5J9HgAU0uc4QNvL1b7fGdtjXm+PtTIrROQCaWnCnxtijFISzkNMQ7
+         n3tGbUwwNNcZGfptiJI8xu4G7wD6Sure3TjMLknCKJXATMQQPY3eIt+xc6UXNQvepBTf
+         kVAw==
+X-Received: by 2002:a17:906:d54b:b0:6df:7cff:42b7 with SMTP id
+ cr11-20020a170906d54b00b006df7cff42b7mr3165170ejc.731.1650126825881; Sat, 16
+ Apr 2022 09:33:45 -0700 (PDT)
+MIME-Version: 1.0
+From: Redacted user <user@example.org>
+Date: Sat, 16 Apr 2022 12:33:34 -0400
+Message-ID: <xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx@mail.gmail.com>
+Subject: =?UTF-8?B?5pyL5Y+LLCBJJ2xsIG1lZXQgeW91IGF0IHRoZSBjYWbDqSB0byBlYXQgamFsYXBlw7Fvcw==?=
+	=?UTF-8?B?LCB0YWxrIGFib3V0IMOcbWxhdXRzLCBhbmQgY2/DtnBlcmF0ZSBvbiB0aGUgY29uc3RydWN0aW9uIG9m?=
+	=?UTF-8?B?IG91ciBHZWlnZXLigJNNw7xsbGVyIHR1YmU=?=
+X-Rendmail-Subject: , I'll meet you at the cafe to eat jalapenos, talk about
+ Umlauts, and cooperate on the construction of our GeigerMuller tube
+To: user@example.org
+Content-Type: multipart/alternative; boundary="0000000000004a84a905dcc8179b"
+
+--0000000000004a84a905dcc8179b
+Content-Type: text/plain; charset="UTF-8"
+
+My, that's quite a subject!
+
+--0000000000004a84a905dcc8179b
+Content-Type: text/html; charset="UTF-8"
+
+<div dir="ltr">My, that&#39;s quite a subject!</div>
+
+--0000000000004a84a905dcc8179b--

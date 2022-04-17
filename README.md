@@ -35,6 +35,8 @@ from messages, so I decided to write my own.
 rendmail can be compiled and installed by first [installing Go] and then
 running `go install` from the root of this repository.
 
+[installing Go]: https://go.dev/doc/install
+
 The `rendmail` executable accepts various command-line flags:
 
 ```
@@ -43,6 +45,8 @@ Reads an email message from stdin and rewrites it to stdout.
 
   -backup-dir string
         Directory to which original, unmodified message will be saved
+  -decode-subject
+        Write X-Rendmail-Subject for RFC-2047-encoded Subject
   -delete-binary
         Delete common binary attachments from message
   -delete-types string
@@ -61,10 +65,21 @@ Reads an email message from stdin and rewrites it to stdout.
 /some/path` to rendmail to save unmodified copies of messages to a temporary
 location in case something goes wrong.
 
+The `-decode-subject` flag can be passed to instruct rendmail to insert a new
+`X-Rendmail-Subject` header field containing an ASCII representation of any [RFC
+2047]-encoded `Subject` field that it finds. This can be helpful if you want to
+filter messages with non-ASCII subjects but your MDA doesn't automatically
+decode headers for you. For example, instead of giving your MDA a regular
+expression like `^Subject: =\?UTF-8\?Q\?Confirmaci=C3=B3n_de_Pago\?=` (to match
+the [Quoted-Printable] subject `Confirmación de Pago`), you can write
+`^X-Rendmail-Subject: Confirmacion de Pago`. Note that diacritics are removed,
+but any characters that can't easily be converted to ASCII are omitted from
+`X-Rendmail-Subject`.
+
+[Quoted-Printable]: https://en.wikipedia.org/wiki/Quoted-printable
+
 Please file an issue if you encounter messages that rendmail has trouble
 processing.
-
-[installing Go]: https://go.dev/doc/install
 
 ### procmail
 
