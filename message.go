@@ -29,7 +29,9 @@ type rewriteOptions struct {
 	Now              time.Time `json:"now"`              // current time
 	DecodeSubject    bool      `json:"decodeSubject"`    // decode Subject header field to X-Rendmail-Subject
 	Strict           bool      `json:"strict"`           // fail for bad messages
-	Verbose          bool      `json:"verbose"`          // write noisy messages to stderr
+
+	verbose bool // write noisy messages to stderr
+	silent  bool // set during testing
 }
 
 // rewriteMessage reads an RFC 5322 (or RFC 2822, or RFC 822, sigh) message from
@@ -40,7 +42,9 @@ func rewriteMessage(r io.Reader, w io.Writer, opts *rewriteOptions) error {
 
 	// If we encountered a message error in non-strict mode, try to copy the rest of the message.
 	if _, ok := err.(*msgError); ok && !opts.Strict {
-		fmt.Fprintln(os.Stderr, "Ignoring error:", err)
+		if !opts.silent {
+			fmt.Fprintln(os.Stderr, "Ignoring error:", err)
+		}
 		if _, err := io.Copy(w, lr.r); err != nil {
 			return err
 		}
@@ -168,7 +172,7 @@ func copyHeader(lr *lineReader, w io.Writer, opts *rewriteOptions) (data headerD
 		} else if key == "Content-Type" && !gotContentType {
 			mtype, params, err := mime.ParseMediaType(val)
 			if err != nil {
-				if opts.Verbose {
+				if opts.verbose {
 					fmt.Fprintf(os.Stderr, "Ignoring invalid Content-Type %q: %v\n", val, err)
 				}
 				// RFC 2045 5.2:
@@ -186,7 +190,7 @@ func copyHeader(lr *lineReader, w io.Writer, opts *rewriteOptions) (data headerD
 				opts.KeepMediaTypes); err != nil {
 				return data, err
 			} else if data.deletePart {
-				if opts.Verbose {
+				if opts.verbose {
 					fmt.Fprintln(os.Stderr, "Deleting "+data.mediaType)
 				}
 

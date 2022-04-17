@@ -36,7 +36,7 @@ func TestRewriteMessage(t *testing.T) {
 
 			base := p[:len(p)-len(suf)]
 
-			var opts rewriteOptions
+			opts := rewriteOptions{silent: true}
 			optsPath := base + ".opts.json"
 			if _, err := os.Stat(optsPath); err == nil {
 				if b, err := ioutil.ReadFile(optsPath); err != nil {
