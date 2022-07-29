@@ -77,7 +77,7 @@ func copyMessagePart(lr *lineReader, w io.Writer, delim string,
 		// so I'm choosing to not check the length here.
 		bnd := hdata.contentParams["boundary"]
 		if bnd == "" {
-			return false, fmt.Errorf("invalid boundary %q", bnd)
+			return false, &msgError{fmt.Sprintf("invalid boundary %q", bnd)}
 		}
 		subDelim := "--" + bnd
 
@@ -324,9 +324,9 @@ var headerDecoder = mime.WordDecoder{
 	},
 }
 var headerTransformChain = transform.Chain(
-	norm.NFD,                           // decompose by canonical equivalence
+	norm.NFD, // decompose by canonical equivalence
 	runes.Remove(runes.In(unicode.Mn)), // remove "Mark, nonspacing"
-	norm.NFC,                           // recompose by canonical equivalence
+	norm.NFC, // recompose by canonical equivalence
 	runes.Remove(runes.Predicate(func(r rune) bool { // remove non-printable ASCII
 		// From RFC 5322 2.2:
 		//  A field name MUST be composed of printable US-ASCII characters (i.e., characters
